@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-blox-light text-blox-dark;
+  }
+}
+
+@layer components {
+  /* Blox-style button */
+  .btn-blox {
+    @apply px-6 py-3 font-bold rounded-lg shadow-blox transition-all;
+    @apply hover:shadow-blox-hover hover:-translate-y-0.5;
+    @apply active:translate-y-0 active:shadow-none;
+  }
+
+  .btn-blox-primary {
+    @apply btn-blox bg-blox-blue text-white;
+  }
+
+  .btn-blox-secondary {
+    @apply btn-blox bg-blox-green text-white;
+  }
+
+  .btn-blox-danger {
+    @apply btn-blox bg-blox-red text-white;
+  }
+
+  /* Blox-style card */
+  .card-blox {
+    @apply bg-white rounded-xl p-6 shadow-blox border-2 border-blox-gray;
+  }
+
+  /* Grid cell styling */
+  .grid-cell {
+    @apply border border-gray-200 transition-all cursor-crosshair;
+  }
+
+  .grid-cell:hover {
+    @apply bg-blox-blue bg-opacity-10 border-blox-blue;
+  }
+
+  .grid-cell-selected {
+    @apply bg-blox-blue bg-opacity-30 border-blox-blue border-2;
+  }
+
+  .grid-cell-occupied {
+    @apply cursor-pointer hover:scale-105 transition-transform;
+  }
+}
