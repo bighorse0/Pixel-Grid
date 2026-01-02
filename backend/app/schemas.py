@@ -31,7 +31,7 @@ class BlockCreate(BaseModel):
     y_start: int = Field(..., ge=0, lt=1000)
     width: int = Field(..., ge=10, multiple_of=10)
     height: int = Field(..., ge=10, multiple_of=10)
-    buyer_email: EmailStr
+    buyer_email: EmailStr | None = None
     link_url: HttpUrl
 
 
@@ -50,7 +50,7 @@ class BlockResponse(BaseModel):
     height: int
     pixel_count: int
     price_paid: Decimal
-    buyer_email: str
+    buyer_email: str | None
     link_url: str | None
     status: str
     purchased_at: datetime

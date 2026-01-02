@@ -37,7 +37,8 @@ export const gridAPI = {
     y_start: number
     width: number
     height: number
-    buyer_email: string
+    buyer_email?: string
+    link_url: string
   }) => {
     const response = await api.post('/blocks/reserve', data)
     return response.data
@@ -84,6 +85,11 @@ export const gridAPI = {
 export const paymentsAPI = {
   createCheckoutSession: async (blockId: string) => {
     const response = await api.post(`/payments/${blockId}/checkout`)
+    return response.data
+  },
+
+  completeTestPayment: async (blockId: string) => {
+    const response = await api.post(`/payments/${blockId}/test-complete`)
     return response.data
   },
 

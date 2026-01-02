@@ -32,7 +32,7 @@ class Block(Base):
     height = Column(Integer, nullable=False)
     pixel_count = Column(Integer, Computed("width * height"), nullable=False)
     price_paid = Column(Numeric(10, 2), nullable=False)
-    buyer_email = Column(String(255), nullable=False)
+    buyer_email = Column(String(255), nullable=True)
     link_url = Column(String(500))
     edit_token = Column(String(255), unique=True, nullable=False)
     status = Column(String(50), nullable=False, default='draft')

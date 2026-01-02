@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     max_image_size_mb: int = 5
     frontend_url: str = "http://localhost:3000"
 
+    # Testing
+    test_mode_enabled: bool = True
+    test_mode_ips: list[str] = ["127.0.0.1", "::1", "localhost"]
+
     # Email
     smtp_host: str | None = None
     smtp_port: int = 587

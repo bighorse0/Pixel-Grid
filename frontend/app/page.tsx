@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import GridCanvas from '@/components/GridCanvas'
 import { gridAPI, paymentsAPI } from '@/lib/api'
 import { loadStripe } from '@stripe/stripe-js'
@@ -8,13 +9,39 @@ import { loadStripe } from '@stripe/stripe-js'
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
 export default function Home() {
+  const searchParams = useSearchParams()
   const [blocks, setBlocks] = useState([])
-  const [step, setStep] = useState<'select' | 'details' | 'checkout' | 'upload'>('select')
+  const [step, setStep] = useState<'select' | 'details' | 'upload' | 'checkout'>('select')
   const [selection, setSelection] = useState<any>(null)
-  const [email, setEmail] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
   const [price, setPrice] = useState(0)
   const [currentBlock, setCurrentBlock] = useState<any>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [hoverTitle, setHoverTitle] = useState('')
+  const [hoverDescription, setHoverDescription] = useState('')
+  const [hoverCta, setHoverCta] = useState('')
+
+  // Handle URL parameters for redirects (e.g., from test checkout)
+  useEffect(() => {
+    const stepParam = searchParams.get('step')
+    const blockIdParam = searchParams.get('block_id')
+    const editTokenParam = searchParams.get('edit_token')
+
+    if (stepParam && blockIdParam) {
+      // Fetch the block details
+      gridAPI.getBlock(blockIdParam).then((block) => {
+        setCurrentBlock({
+          ...block,
+          edit_token: editTokenParam || block.edit_token
+        })
+        setLinkUrl(block.link_url || '')
+        setStep(stepParam as any)
+      }).catch((error) => {
+        console.error('Failed to fetch block:', error)
+        alert('Failed to load block. Please try again.')
+      })
+    }
+  }, [searchParams])
 
   // Load grid state
   useEffect(() => {
@@ -61,7 +88,13 @@ export default function Home() {
   }
 
   const handleReserve = async () => {
-    if (!email || !linkUrl || !selection) return
+    if (!linkUrl || !selection) return
+
+    // Ensure URL has a protocol
+    let normalizedUrl = linkUrl.trim()
+    if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+      normalizedUrl = 'https://' + normalizedUrl
+    }
 
     try {
       const block = await gridAPI.reserveBlock({
@@ -69,15 +102,36 @@ export default function Home() {
         y_start: selection.y,
         width: selection.width,
         height: selection.height,
-        buyer_email: email,
-        link_url: linkUrl,
+        link_url: normalizedUrl,
       })
 
       setCurrentBlock(block)
-      setStep('checkout')
+      setStep('upload')
     } catch (error) {
       console.error('Failed to reserve block:', error)
       alert('Failed to reserve block. Please try again.')
+    }
+  }
+
+  const handleUpload = async () => {
+    if (!currentBlock || !imageFile) return
+
+    try {
+      await gridAPI.uploadImage(
+        currentBlock.id,
+        currentBlock.edit_token,
+        imageFile,
+        {
+          link_url: linkUrl,
+          hover_title: hoverTitle || undefined,
+          hover_description: hoverDescription || undefined,
+          hover_cta: hoverCta || undefined,
+        }
+      )
+      setStep('checkout')
+    } catch (error) {
+      console.error('Failed to upload image:', error)
+      alert('Failed to upload image. Please try again.')
     }
   }
 
@@ -142,7 +196,7 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 py-12">
         {/* Step indicator */}
         <div className="mb-8 flex justify-center gap-4">
-          {['select', 'details', 'checkout', 'upload'].map((s, i) => (
+          {['select', 'details', 'upload', 'checkout'].map((s, i) => (
             <div
               key={s}
               className={`flex items-center gap-2 ${
@@ -232,32 +286,17 @@ export default function Home() {
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-bold mb-2">Your Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-2 border-2 border-blox-gray rounded-lg focus:border-blox-blue focus:outline-none"
-                  placeholder="you@example.com"
-                  required
-                />
-                <p className="text-xs text-gray-600 mt-1">
-                  We'll send your edit token here. No account needed.
-                </p>
-              </div>
-
-              <div className="mb-4">
                 <label className="block text-sm font-bold mb-2">Link URL</label>
                 <input
-                  type="url"
+                  type="text"
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   className="w-full px-4 py-2 border-2 border-blox-gray rounded-lg focus:border-blox-blue focus:outline-none"
-                  placeholder="https://yourwebsite.com"
+                  placeholder="yourwebsite.com or https://yourwebsite.com"
                   required
                 />
                 <p className="text-xs text-gray-600 mt-1">
-                  Your block will link to this URL when clicked.
+                  Your block will link to this URL when clicked. No need to include https://
                 </p>
               </div>
 
@@ -270,7 +309,97 @@ export default function Home() {
                 </button>
                 <button
                   onClick={handleReserve}
-                  disabled={!email || !linkUrl}
+                  disabled={!linkUrl}
+                  className="btn-blox-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Continue to Upload
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step: Upload */}
+        {step === 'upload' && currentBlock && (
+          <div className="max-w-xl mx-auto">
+            <h2 className="text-3xl font-bold mb-6">Upload Your Image</h2>
+            <div className="card-blox mb-6">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-4">
+                  Upload your image before payment. Your image will be reviewed and must meet our content guidelines.
+                </p>
+                <div className="space-y-2 text-sm mb-4">
+                  <div className="flex justify-between">
+                    <span>Block Size:</span>
+                    <span className="font-mono">{currentBlock.width}x{currentBlock.height}px</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Link URL:</span>
+                    <span className="font-mono text-xs break-all">{linkUrl}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-bold mb-2">Image File</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                  className="w-full px-4 py-2 border-2 border-blox-gray rounded-lg focus:border-blox-blue focus:outline-none"
+                  required
+                />
+                <p className="text-xs text-gray-600 mt-1">
+                  Upload an image that fits your {currentBlock.width}x{currentBlock.height} block. Max 5MB.
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-bold mb-2">Hover Title (Optional)</label>
+                <input
+                  type="text"
+                  value={hoverTitle}
+                  onChange={(e) => setHoverTitle(e.target.value)}
+                  className="w-full px-4 py-2 border-2 border-blox-gray rounded-lg focus:border-blox-blue focus:outline-none"
+                  placeholder="Brief title shown on hover"
+                  maxLength={100}
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-bold mb-2">Hover Description (Optional)</label>
+                <textarea
+                  value={hoverDescription}
+                  onChange={(e) => setHoverDescription(e.target.value)}
+                  className="w-full px-4 py-2 border-2 border-blox-gray rounded-lg focus:border-blox-blue focus:outline-none"
+                  placeholder="Description shown on hover"
+                  maxLength={255}
+                  rows={3}
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-bold mb-2">Call-to-Action (Optional)</label>
+                <input
+                  type="text"
+                  value={hoverCta}
+                  onChange={(e) => setHoverCta(e.target.value)}
+                  className="w-full px-4 py-2 border-2 border-blox-gray rounded-lg focus:border-blox-blue focus:outline-none"
+                  placeholder="e.g., 'Visit Site', 'Learn More'"
+                  maxLength={50}
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setStep('details')}
+                  className="btn-blox-secondary flex-1"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleUpload}
+                  disabled={!imageFile}
                   className="btn-blox-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Continue to Payment
@@ -286,8 +415,16 @@ export default function Home() {
             <h2 className="text-3xl font-bold mb-6">Complete Payment</h2>
             <div className="card-blox mb-6">
               <p className="mb-4">
-                Your block has been reserved! Click below to complete payment via Stripe.
+                Your image has been uploaded and is being reviewed! Click below to complete payment via Stripe.
               </p>
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800">
+                  ✓ Image uploaded successfully
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Your block will appear on the grid once payment is complete and moderation is approved.
+                </p>
+              </div>
               <button onClick={handleCheckout} className="btn-blox-primary w-full">
                 Pay ${price.toFixed(2)}
               </button>

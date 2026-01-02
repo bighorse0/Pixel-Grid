@@ -16,6 +16,7 @@ stripe.api_key = settings.stripe_secret_key
 @router.post("/{block_id}/checkout", response_model=CheckoutSession)
 async def create_checkout_session(
     block_id: UUID,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """Create Stripe checkout session for block payment"""
@@ -25,6 +26,15 @@ async def create_checkout_session(
 
     if block.status != 'draft':
         raise HTTPException(status_code=400, detail="Block already paid")
+
+    # Check if request is from test mode IP
+    client_ip = request.client.host
+    if settings.test_mode_enabled and client_ip in settings.test_mode_ips:
+        # Skip Stripe and use test payment endpoint
+        return {
+            "session_id": "test_mode",
+            "url": f"{settings.frontend_url}/test-checkout?block_id={block_id}"
+        }
 
     # Create Stripe checkout session
     try:
@@ -68,6 +78,47 @@ async def create_checkout_session(
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{block_id}/test-complete")
+async def complete_test_payment(
+    block_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Complete test payment (bypass Stripe for testing)"""
+    # Check if request is from test mode IP
+    client_ip = request.client.host
+    if not settings.test_mode_enabled or client_ip not in settings.test_mode_ips:
+        raise HTTPException(status_code=403, detail="Test mode not available")
+
+    block = db.query(Block).filter(Block.id == block_id).first()
+    if not block:
+        raise HTTPException(status_code=404, detail="Block not found")
+
+    if block.status != 'draft':
+        raise HTTPException(status_code=400, detail="Block already paid")
+
+    # Create test payment record
+    payment = Payment(
+        block_id=block_id,
+        stripe_payment_id=f"test_{block_id}",
+        amount=block.price_paid,
+        status='succeeded'
+    )
+    db.add(payment)
+
+    # Update block status to pending review (ready for image upload)
+    block.status = 'pending_review'
+
+    db.commit()
+    db.refresh(block)
+
+    return {
+        "status": "success",
+        "block_id": str(block_id),
+        "message": "Test payment completed successfully"
+    }
 
 
 @router.post("/webhook")

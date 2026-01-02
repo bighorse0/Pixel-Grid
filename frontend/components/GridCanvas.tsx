@@ -27,6 +27,7 @@ const MIN_BLOCK_SIZE = 10
 export default function GridCanvas({ blocks, onSelect, selectionMode = false }: GridCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map())
   const [scale, setScale] = useState(1)
   const [autoScale, setAutoScale] = useState(1)
   const [isDragging, setIsDragging] = useState(false)
@@ -34,6 +35,26 @@ export default function GridCanvas({ blocks, onSelect, selectionMode = false }: 
   const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null)
   const [hoveredBlock, setHoveredBlock] = useState<Block | null>(null)
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [imagesLoaded, setImagesLoaded] = useState(0)
+
+  // Preload images when blocks change
+  useEffect(() => {
+    let loadedCount = 0
+    const cache = imageCache.current
+
+    blocks.forEach((block) => {
+      if (block.image_url && !cache.has(block.image_url)) {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+          loadedCount++
+          setImagesLoaded(loadedCount)
+        }
+        img.src = block.image_url
+        cache.set(block.image_url, img)
+      }
+    })
+  }, [blocks])
 
   // Calculate auto-scale to fit container
   useEffect(() => {
@@ -145,11 +166,9 @@ export default function GridCanvas({ blocks, onSelect, selectionMode = false }: 
     // Draw blocks with images
     blocks.forEach((block) => {
       if (block.image_url) {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.src = block.image_url
-        img.onload = () => {
-          ctx.drawImage(img, block.x_start, block.y_start, block.width, block.height)
+        const cachedImg = imageCache.current.get(block.image_url)
+        if (cachedImg && cachedImg.complete) {
+          ctx.drawImage(cachedImg, block.x_start, block.y_start, block.width, block.height)
 
           // Draw border
           ctx.strokeStyle = hoveredBlock?.id === block.id ? '#0066ff' : '#393b3d'
@@ -193,7 +212,7 @@ export default function GridCanvas({ blocks, onSelect, selectionMode = false }: 
 
       ctx.setLineDash([])
     }
-  }, [blocks, selection, hoveredBlock, selectionMode, isDragging, mousePos])
+  }, [blocks, selection, hoveredBlock, selectionMode, isDragging, mousePos, imagesLoaded])
 
   const totalScale = autoScale * scale
 
