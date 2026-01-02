@@ -32,6 +32,7 @@ class BlockCreate(BaseModel):
     width: int = Field(..., ge=10, multiple_of=10)
     height: int = Field(..., ge=10, multiple_of=10)
     buyer_email: EmailStr
+    link_url: HttpUrl
 
 
 class BlockImageUpload(BaseModel):
@@ -50,10 +51,27 @@ class BlockResponse(BaseModel):
     pixel_count: int
     price_paid: Decimal
     buyer_email: str
+    link_url: str | None
     status: str
     purchased_at: datetime
     approved_at: datetime | None
     expires_at: datetime | None
+
+    class Config:
+        from_attributes = True
+
+
+class GridBlockResponse(BaseModel):
+    id: UUID
+    x_start: int
+    y_start: int
+    width: int
+    height: int
+    image_url: str | None
+    link_url: str | None
+    hover_title: str | None
+    hover_description: str | None
+    hover_cta: str | None
 
     class Config:
         from_attributes = True

@@ -8,7 +8,7 @@ from ..database import get_db
 from ..models import Block, BlockImage, GridRegion, BannedContent
 from ..schemas import (
     BlockCreate, BlockResponse, BlockImageUpload, GridAvailabilityCheck,
-    GridAvailabilityResponse, BlockImageResponse
+    GridAvailabilityResponse, BlockImageResponse, GridBlockResponse
 )
 from ..services.storage import StorageService
 from ..services.moderation import ModerationService
@@ -113,6 +113,7 @@ async def reserve_block(
         height=data.height,
         price_paid=price,
         buyer_email=data.buyer_email,
+        link_url=str(data.link_url),
         edit_token=edit_token,
         status='draft'
     )
@@ -209,11 +210,31 @@ async def upload_block_image(
     return block_image
 
 
-@router.get("/grid", response_model=list[BlockResponse])
+@router.get("/grid", response_model=list[GridBlockResponse])
 async def get_grid_state(db: Session = Depends(get_db)):
     """Get all approved blocks for grid rendering"""
     blocks = db.query(Block).filter(Block.status == 'approved').all()
-    return blocks
+
+    # Transform blocks with their images
+    grid_blocks = []
+    for block in blocks:
+        # Get the associated image if it exists
+        image = db.query(BlockImage).filter(BlockImage.block_id == block.id).first()
+
+        grid_blocks.append({
+            'id': block.id,
+            'x_start': block.x_start,
+            'y_start': block.y_start,
+            'width': block.width,
+            'height': block.height,
+            'image_url': image.image_url if image else None,
+            'link_url': block.link_url,
+            'hover_title': image.hover_title if image else None,
+            'hover_description': image.hover_description if image else None,
+            'hover_cta': image.hover_cta if image else None,
+        })
+
+    return grid_blocks
 
 
 @router.get("/{block_id}", response_model=BlockResponse)

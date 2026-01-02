@@ -12,6 +12,7 @@ export default function Home() {
   const [step, setStep] = useState<'select' | 'details' | 'checkout' | 'upload'>('select')
   const [selection, setSelection] = useState<any>(null)
   const [email, setEmail] = useState('')
+  const [linkUrl, setLinkUrl] = useState('')
   const [price, setPrice] = useState(0)
   const [currentBlock, setCurrentBlock] = useState<any>(null)
 
@@ -29,19 +30,26 @@ export default function Home() {
     }
   }
 
-  const handleSelection = async (sel: any) => {
+  const handleSelection = (sel: any) => {
     setSelection(sel)
+    // Calculate estimated price locally (backend will verify)
+    const pixelCount = sel.width * sel.height
+    setPrice(pixelCount * 1.00) // $1 per pixel
+  }
+
+  const handleBuyPixels = async () => {
+    if (!selection) return
 
     try {
       const availability = await gridAPI.checkAvailability({
-        x_start: sel.x,
-        y_start: sel.y,
-        width: sel.width,
-        height: sel.height,
+        x_start: selection.x,
+        y_start: selection.y,
+        width: selection.width,
+        height: selection.height,
       })
 
       if (availability.available) {
-        setPrice(availability.total_price)
+        setPrice(Number(availability.total_price))
         setStep('details')
       } else {
         alert('This area is not available. Please select a different area.')
@@ -53,7 +61,7 @@ export default function Home() {
   }
 
   const handleReserve = async () => {
-    if (!email || !selection) return
+    if (!email || !linkUrl || !selection) return
 
     try {
       const block = await gridAPI.reserveBlock({
@@ -62,6 +70,7 @@ export default function Home() {
         width: selection.width,
         height: selection.height,
         buyer_email: email,
+        link_url: linkUrl,
       })
 
       setCurrentBlock(block)
@@ -87,26 +96,43 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       {/* Hero */}
-      <div className="bg-gradient-to-r from-blox-blue to-blox-green text-white py-16">
-        <div className="max-w-7xl mx-auto px-4">
-          <h1 className="text-5xl font-bold mb-4 drop-shadow-lg">
-            BloxGrid
-          </h1>
-          <p className="text-xl mb-8">
-            Own your block on the grid. Upload your image. Be part of history.
-          </p>
-          <div className="flex gap-4">
-            <div className="card-blox bg-white text-blox-dark">
-              <div className="text-3xl font-bold text-blox-blue">1,000,000</div>
-              <div className="text-sm">Total Pixels</div>
+      <div className="text-white py-4 relative overflow-hidden">
+        {/* Roblox-style repeating color blocks */}
+        <div className="absolute inset-0 flex">
+          {[...Array(60)].map((_, i) => {
+            const colors = ['#C1191F', '#E2231A', '#FF2D2D']
+            return (
+              <div
+                key={i}
+                className="flex-1"
+                style={{ backgroundColor: colors[i % 3] }}
+              />
+            )
+          })}
+        </div>
+        <div className="max-w-7xl mx-auto px-4 relative z-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-1">
+                BloxGrid
+              </h1>
+              <p className="text-sm opacity-90">
+                Own your block on the grid. Upload your image. Be part of history.
+              </p>
             </div>
-            <div className="card-blox bg-white text-blox-dark">
-              <div className="text-3xl font-bold text-blox-green">{blocks.length}</div>
-              <div className="text-sm">Blocks Sold</div>
-            </div>
-            <div className="card-blox bg-white text-blox-dark">
-              <div className="text-3xl font-bold text-blox-red">$1.00</div>
-              <div className="text-sm">Per Pixel</div>
+            <div className="flex gap-3">
+              <div className="bg-black bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded">
+                <div className="text-xl font-bold">1,000,000</div>
+                <div className="text-xs opacity-90">Total Pixels</div>
+              </div>
+              <div className="bg-black bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded">
+                <div className="text-xl font-bold">{blocks.length}</div>
+                <div className="text-xs opacity-90">Blocks Sold</div>
+              </div>
+              <div className="bg-black bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded">
+                <div className="text-xl font-bold">$1.00</div>
+                <div className="text-xs opacity-90">Per Pixel</div>
+              </div>
             </div>
           </div>
         </div>
@@ -143,6 +169,40 @@ export default function Home() {
               Drag on the grid to select your block. Minimum size: 10x10 pixels.
             </p>
             <GridCanvas blocks={blocks} onSelect={handleSelection} selectionMode={true} />
+
+            {selection && (
+              <div className="mt-6 max-w-xl mx-auto">
+                <div className="card-blox">
+                  <div className="mb-4">
+                    <h3 className="font-bold mb-2">Selection Details</h3>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Position:</span>
+                        <span className="font-mono">({selection.x}, {selection.y})</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Size:</span>
+                        <span className="font-mono">{selection.width}x{selection.height}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Pixels:</span>
+                        <span className="font-mono">{selection.width * selection.height}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-lg text-blox-blue">
+                        <span>Estimated Price:</span>
+                        <span>${price.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleBuyPixels}
+                    className="btn-blox-primary w-full"
+                  >
+                    Buy Pixels
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -186,6 +246,21 @@ export default function Home() {
                 </p>
               </div>
 
+              <div className="mb-4">
+                <label className="block text-sm font-bold mb-2">Link URL</label>
+                <input
+                  type="url"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  className="w-full px-4 py-2 border-2 border-blox-gray rounded-lg focus:border-blox-blue focus:outline-none"
+                  placeholder="https://yourwebsite.com"
+                  required
+                />
+                <p className="text-xs text-gray-600 mt-1">
+                  Your block will link to this URL when clicked.
+                </p>
+              </div>
+
               <div className="flex gap-4">
                 <button
                   onClick={() => setStep('select')}
@@ -195,7 +270,7 @@ export default function Home() {
                 </button>
                 <button
                   onClick={handleReserve}
-                  disabled={!email}
+                  disabled={!email || !linkUrl}
                   className="btn-blox-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Continue to Payment

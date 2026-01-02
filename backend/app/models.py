@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, TIMESTAMP, Numeric, Text, ARRAY, ForeignKey, CheckConstraint
+from sqlalchemy import Column, String, Integer, Boolean, TIMESTAMP, Numeric, Text, ARRAY, ForeignKey, CheckConstraint, Computed
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -30,9 +30,10 @@ class Block(Base):
     y_start = Column(Integer, nullable=False)
     width = Column(Integer, nullable=False)
     height = Column(Integer, nullable=False)
-    pixel_count = Column(Integer)
+    pixel_count = Column(Integer, Computed("width * height"), nullable=False)
     price_paid = Column(Numeric(10, 2), nullable=False)
     buyer_email = Column(String(255), nullable=False)
+    link_url = Column(String(500))
     edit_token = Column(String(255), unique=True, nullable=False)
     status = Column(String(50), nullable=False, default='draft')
     rejection_reason = Column(Text)
@@ -120,7 +121,7 @@ class AdminAction(Base):
     target_type = Column(String(50), nullable=False)
     target_id = Column(UUID(as_uuid=True))
     reason = Column(Text)
-    metadata = Column(JSONB)
+    meta_data = Column(JSONB)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     admin = relationship("Admin", back_populates="actions")
@@ -158,5 +159,5 @@ class GridRegion(Base):
     price_per_pixel = Column(Numeric(5, 2), default=1.00)
     is_locked = Column(Boolean, default=False)
     is_premium = Column(Boolean, default=False)
-    metadata = Column(JSONB)
+    meta_data = Column(JSONB)
     created_at = Column(TIMESTAMP, server_default=func.now())

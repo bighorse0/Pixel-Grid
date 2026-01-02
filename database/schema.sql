@@ -89,7 +89,7 @@ CREATE TABLE admin_actions (
     target_type VARCHAR(50) NOT NULL CHECK (target_type IN ('block', 'domain', 'image_hash')),
     target_id UUID,
     reason TEXT,
-    metadata JSONB,
+    meta_data JSONB,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -115,7 +115,7 @@ CREATE TABLE grid_regions (
     price_per_pixel DECIMAL(5, 2) DEFAULT 1.00,
     is_locked BOOLEAN DEFAULT FALSE,
     is_premium BOOLEAN DEFAULT FALSE,
-    metadata JSONB,
+    meta_data JSONB,
     created_at TIMESTAMP DEFAULT NOW()
 );
 

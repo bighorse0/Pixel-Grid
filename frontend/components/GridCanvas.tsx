@@ -26,12 +26,31 @@ const MIN_BLOCK_SIZE = 10
 
 export default function GridCanvas({ blocks, onSelect, selectionMode = false }: GridCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [scale, setScale] = useState(0.8)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+  const [autoScale, setAutoScale] = useState(1)
   const [isDragging, setIsDragging] = useState(false)
   const [selection, setSelection] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null)
   const [hoveredBlock, setHoveredBlock] = useState<Block | null>(null)
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+
+  // Calculate auto-scale to fit container
+  useEffect(() => {
+    const updateScale = () => {
+      if (containerRef.current) {
+        const containerWidth = containerRef.current.clientWidth
+        const containerHeight = containerRef.current.clientHeight
+        const minDimension = Math.min(containerWidth, containerHeight)
+        const newAutoScale = (minDimension - 8) / GRID_SIZE // 8px for border
+        setAutoScale(newAutoScale)
+      }
+    }
+
+    updateScale()
+    window.addEventListener('resize', updateScale)
+    return () => window.removeEventListener('resize', updateScale)
+  }, [])
 
   const snapToGrid = (value: number) => Math.floor(value / MIN_BLOCK_SIZE) * MIN_BLOCK_SIZE
 
@@ -40,8 +59,9 @@ export default function GridCanvas({ blocks, onSelect, selectionMode = false }: 
     if (!canvas) return { x: 0, y: 0 }
 
     const rect = canvas.getBoundingClientRect()
-    const x = Math.floor((e.clientX - rect.left) / scale)
-    const y = Math.floor((e.clientY - rect.top) / scale)
+    const totalScale = autoScale * scale
+    const x = Math.floor((e.clientX - rect.left) / totalScale)
+    const y = Math.floor((e.clientY - rect.top) / totalScale)
 
     return {
       x: Math.max(0, Math.min(GRID_SIZE, snapToGrid(x))),
@@ -175,6 +195,8 @@ export default function GridCanvas({ blocks, onSelect, selectionMode = false }: 
     }
   }, [blocks, selection, hoveredBlock, selectionMode, isDragging, mousePos])
 
+  const totalScale = autoScale * scale
+
   return (
     <div className="relative">
       <div className="mb-4 flex gap-4 items-center">
@@ -186,27 +208,40 @@ export default function GridCanvas({ blocks, onSelect, selectionMode = false }: 
             Zoom In
           </button>
           <button
-            onClick={() => setScale(Math.max(0.3, scale - 0.1))}
+            onClick={() => setScale(Math.max(0.5, scale - 0.1))}
             className="btn-blox-primary text-sm"
           >
             Zoom Out
           </button>
           <button onClick={() => setScale(1)} className="btn-blox-secondary text-sm">
-            Reset
+            Fit to Screen
           </button>
         </div>
         <div className="text-sm text-gray-600">
-          Scale: {Math.round(scale * 100)}%
+          Zoom: {Math.round(scale * 100)}%
         </div>
       </div>
 
-      <div className="border-4 border-blox-gray rounded-lg overflow-auto bg-white shadow-blox">
+      <div
+        ref={containerRef}
+        className="border-4 border-blox-gray rounded-lg overflow-auto bg-white shadow-blox w-full aspect-square max-h-[80vh]"
+      >
         <canvas
           ref={canvasRef}
           width={GRID_SIZE}
           height={GRID_SIZE}
-          style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
-          className={selectionMode ? 'cursor-crosshair' : 'cursor-pointer'}
+          style={{
+            transform: `scale(${totalScale})`,
+            transformOrigin: 'top left',
+            display: 'block'
+          }}
+          className={
+            selectionMode
+              ? 'cursor-crosshair'
+              : hoveredBlock?.link_url
+                ? 'cursor-pointer'
+                : 'cursor-default'
+          }
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
